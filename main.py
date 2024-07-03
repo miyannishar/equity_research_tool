@@ -11,14 +11,11 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
-
-# os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
-
-openai_api_key = st.secrets["openai"]["api_key"]
-
-# Aba ta hunai parca aba ni vayena vani kaam xain ahaoiio ata
+os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
 
 
 
