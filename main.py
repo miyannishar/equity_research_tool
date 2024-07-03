@@ -2,19 +2,20 @@ import os
 import streamlit as st
 import time
 import fitz  # PyMuPDF
-from langchain.llms import OpenAI
-from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.chat_models import ChatOpenAI
+from langchain.chains import ConversationalRetrievalChain
 from langchain.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.docstore.document import Document
+from langchain.memory import ConversationBufferMemory
 import re
 
 # Ensure that the OPENAI_API_KEY is set
 os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
 
-st.title("News Research Tool")
+st.title("News Research Chat")
 st.sidebar.title("Upload Content")
 
 # Initialize session state
@@ -24,6 +25,8 @@ if 'pdf_files' not in st.session_state:
     st.session_state.pdf_files = []
 if 'vectorstore' not in st.session_state:
     st.session_state.vectorstore = None
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
 # Function to add a new URL input
 def add_url():
@@ -44,7 +47,7 @@ if st.sidebar.button("Add another URL"):
 process_content_clicked = st.sidebar.button("Process Content")
 
 main_placeholder = st.empty()
-llm = OpenAI(temperature=0.7, max_tokens=500)
+chat_model = ChatOpenAI(temperature=0.7, max_tokens=500)
 
 def extract_text_from_pdf(pdf):
     doc = fitz.open(stream=pdf.read(), filetype="pdf")
@@ -103,27 +106,52 @@ if process_content_clicked:
         vectorstore = FAISS.from_documents(docs, embeddings)
         st.session_state.vectorstore = vectorstore
 
+        # Initialize conversation memory
+        st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
         main_placeholder.text(f"Processing complete. Total chunks: {len(docs)}")
         time.sleep(2)
     else:
         st.warning("No content to process. Please add URLs or upload PDF files.")
 
-query = main_placeholder.text_input("Question:")
+# Display chat history
+for message in st.session_state.chat_history:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-if query:
-    if st.session_state.vectorstore:
-        chain = RetrievalQAWithSourcesChain.from_llm(
-            llm=llm, 
-            retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3})
-        )
-        result = chain({"question": query}, return_only_outputs=True)
-        st.header("Answer")
-        st.subheader(result["answer"])
-        sources = result.get("sources", "")
-        if sources:
-            st.subheader("Sources:")
-            sources_list = sources.split("\n")
-            for source in sources_list:
-                st.write(source)
-    else:
-        st.warning("Please process some content before asking questions.")
+# Chat input
+if prompt := st.chat_input("What would you like to know?"):
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+
+        if st.session_state.vectorstore:
+            chain = ConversationalRetrievalChain.from_llm(
+                llm=chat_model,
+                retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
+                memory=st.session_state.memory
+            )
+            result = chain({"question": prompt})
+            full_response = result['answer']
+
+            # Simulate stream of response with milliseconds delay
+            for chunk in full_response.split():
+                full_response += chunk + " "
+                time.sleep(0.05)
+                # Add a blinking cursor to simulate typing
+                message_placeholder.markdown(full_response + "▌")
+            message_placeholder.markdown(full_response)
+        else:
+            full_response = "Please process some content before starting the chat."
+            message_placeholder.markdown(full_response)
+        
+        st.session_state.chat_history.append({"role": "assistant", "content": full_response})
+
+# Add a button to clear chat history
+if st.button("Clear Chat History"):
+    st.session_state.chat_history = []
+    st.session_state.memory.clear()
