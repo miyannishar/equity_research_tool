@@ -10,6 +10,14 @@ from langchain.document_loaders import UnstructuredURLLoader
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
+
+# Aba ta hunai parca aba ni vayena vani kaam xain ahaoiio ata
 
 
 
@@ -23,6 +31,7 @@ for i in range(3):
 
 process_url_clicked = st.sidebar.button("Process URLs")
 file_path = "faiss_store_openai.pkl"
+
 
 main_placeholder = st.empty()
 llm = OpenAI(temperature=0.9, max_tokens=500) 
