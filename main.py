@@ -28,7 +28,7 @@ file_path = "faiss_store_openai.pkl"
 
 
 main_placeholder = st.empty()
-llm = OpenAI(temperature=0.9, max_tokens=500,openai_api_key=openai_api_key) 
+llm = OpenAI(temperature=0.9, max_tokens=500) 
 
 if process_url_clicked:
     loaders = UnstructuredURLLoader(urls=urls)
