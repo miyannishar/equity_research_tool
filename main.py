@@ -10,6 +10,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.docstore.document import Document
 from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
 import re
 
 # Ensure that the OPENAI_API_KEY is set
@@ -65,6 +66,14 @@ def preprocess_text(text):
     text = re.sub(r'[^\w\s.,!?]', '', text)
     return text
 
+def remove_duplicates(text):
+    sentences = text.split('. ')
+    unique_sentences = []
+    for sentence in sentences:
+        if sentence not in unique_sentences:
+            unique_sentences.append(sentence)
+    return '. '.join(unique_sentences)
+
 if process_content_clicked:
     documents = []
     
@@ -114,6 +123,29 @@ if process_content_clicked:
     else:
         st.warning("No content to process. Please add URLs or upload PDF files.")
 
+# Custom prompt template
+template = """You are an AI assistant tasked with answering questions based on the given context. 
+Use the information provided in the context to answer the question concisely and avoid repetition. 
+If the answer cannot be found in the context, simply state that you don't have enough information to answer accurately.
+
+Context: {context}
+Question: {question}
+Answer: """
+
+PROMPT = PromptTemplate(
+    template=template,
+    input_variables=["context", "question"]
+)
+
+# Create the ConversationalRetrievalChain
+if 'chain' not in st.session_state and st.session_state.vectorstore is not None:
+    st.session_state.chain = ConversationalRetrievalChain.from_llm(
+        llm=chat_model,
+        retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
+        memory=st.session_state.memory,
+        combine_docs_chain_kwargs={"prompt": PROMPT}
+    )
+
 # Display chat history
 for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
@@ -129,14 +161,9 @@ if prompt := st.chat_input("What would you like to know?"):
         message_placeholder = st.empty()
         full_response = ""
 
-        if st.session_state.vectorstore:
-            chain = ConversationalRetrievalChain.from_llm(
-                llm=chat_model,
-                retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
-                memory=st.session_state.memory
-            )
-            result = chain({"question": prompt})
-            full_response = result['answer']
+        if 'chain' in st.session_state:
+            result = st.session_state.chain({"question": prompt})
+            full_response = remove_duplicates(result['answer'])
 
             # Simulate stream of response with milliseconds delay
             for chunk in full_response.split():
@@ -148,10 +175,13 @@ if prompt := st.chat_input("What would you like to know?"):
         else:
             full_response = "Please process some content before starting the chat."
             message_placeholder.markdown(full_response)
-        
+
         st.session_state.chat_history.append({"role": "assistant", "content": full_response})
 
 # Add a button to clear chat history
 if st.button("Clear Chat History"):
     st.session_state.chat_history = []
-    st.session_state.memory.clear()
+    if 'memory' in st.session_state:
+        st.session_state.memory.clear()
+    if 'chain' in st.session_state:
+        del st.session_state.chain
