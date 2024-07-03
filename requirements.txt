@@ -10,3 +10,4 @@ streamlit==1.35.0
 tiktoken==0.7.0
 unstructured==0.14.4
 unstructured-client==0.23.0
+dotenv
