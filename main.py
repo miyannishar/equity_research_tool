@@ -3,21 +3,179 @@ import streamlit as st
 import time
 import fitz  # PyMuPDF
 from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
+from langchain.chains import RetrievalQA
 from langchain.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.docstore.document import Document
-from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
 import re
 
 # Ensure that the OPENAI_API_KEY is set
 os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
 
-st.title("News Research Chat")
-st.sidebar.title("Upload Content")
+# Set page config
+st.set_page_config(page_title="📰 ResearchMate", page_icon="📰", layout="wide")
+
+# Apply custom CSS for light and dark theme
+st.markdown("""
+<style>
+    :root {
+        --bg-color-light: #ffffff;
+        --bg-color-dark: #121212;
+        --main-bg-light: #f0f0f0;
+        --main-bg-dark: #121212;
+        --text-color-light: #000000;
+        --text-color-dark: #E0E0E0;
+        --sidebar-bg-light: #e0e0e0;
+        --sidebar-bg-dark: #1E1E1E;
+        --button-bg-light: #2C3E50;
+        --button-bg-dark: #2C3E50;
+        --button-hover-bg-light: #34495E;
+        --button-hover-bg-dark: #34495E;
+        --input-bg-light: #ffffff;
+        --input-bg-dark: #2D2D2D;
+        --input-border-light: #cccccc;
+        --input-border-dark: #2C3E50;
+        --alert-bg-light: #ffcccc;
+        --alert-bg-dark: #2C3E50;
+        --chat-bg-light: #e0e0e0;
+        --chat-bg-dark: #1E1E1E;
+        --chat-border-light: #cccccc;
+        --chat-border-dark: #2C3E50;
+    }
+    @media (prefers-color-scheme: light) {
+        .stApp {
+            background-color: var(--bg-color-light) !important;
+        }
+        .main .block-container {
+            background-color: var(--main-bg-light) !important;
+        }
+        body {
+            color: var(--text-color-light) !important;
+            background-color: var(--bg-color-light) !important;
+        }
+        .sidebar .sidebar-content {
+            background-color: var(--sidebar-bg-light) !important;
+        }
+        .stButton>button {
+            background-color: var(--button-bg-light) !important;
+            color: var(--text-color-light) !important;
+        }
+        .stButton>button:hover {
+            background-color: var(--button-hover-bg-light) !important;
+        }
+        .stTextInput>div>div>input {
+            background-color: var(--input-bg-light) !important;
+            color: var(--text-color-light) !important;
+            border: 1px solid var(--input-border-light) !important;
+        }
+        .stAlert > div {
+            color: var(--text-color-light) !important;
+            background-color: var(--alert-bg-light) !important;
+        }
+        .chat-message {
+            background-color: var(--chat-bg-light) !important;
+            border: 1px solid var(--chat-border-light) !important;
+        }
+    }
+    @media (prefers-color-scheme: dark) {
+        .stApp {
+            background-color: var(--bg-color-dark) !important;
+        }
+        .main .block-container {
+            background-color: var(--main-bg-dark) !important;
+        }
+        body {
+            color: var(--text-color-dark) !important;
+            background-color: var(--bg-color-dark) !important;
+        }
+        .sidebar .sidebar-content {
+            background-color: var(--sidebar-bg-dark) !important;
+        }
+        .stButton>button {
+            background-color: var(--button-bg-dark) !important;
+            color: var(--text-color-dark) !important;
+        }
+        .stButton>button:hover {
+            background-color: var(--button-hover-bg-dark) !important;
+        }
+        .stTextInput>div>div>input {
+            background-color: var(--input-bg-dark) !important;
+            color: var(--text-color-dark) !important;
+            border: 1px solid var(--input-border-dark) !important;
+        }
+        .stAlert > div {
+            color: var(--text-color-dark) !important;
+            background-color: var(--alert-bg-dark) !important;
+        }
+        .chat-message {
+            background-color: var(--chat-bg-dark) !important;
+            border: 1px solid var(--chat-border-dark) !important;
+        }
+    }
+    /* Common Styles */
+    .stButton>button {
+        width: 100%;
+        border: none !important;
+        border-radius: 5px !important;
+        padding: 10px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    }
+    .stButton>button:hover {
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15) !important;
+        transform: translateY(-2px) !important;
+    }
+    .stTextInput>div>div>input:focus {
+        box-shadow: 0 0 5px rgba(52, 73, 94, 0.5) !important;
+    }
+    .element-container {
+        opacity: 0;
+        animation: fade-in 0.5s ease-in-out forwards;
+    }
+    @keyframes fade-in {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .chat-message {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+    .chat-message:hover {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+    .user-message {
+        border-left: 5px solid var(--button-bg-dark) !important;
+    }
+    .bot-message {
+        border-left: 5px solid var(--button-hover-bg-dark) !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Main title with animation
+st.markdown("""
+    <h1 style='text-align: center; color: inherit !important; animation: pulse 2s infinite;'>
+        📰 ResearchMate
+    </h1>
+    <style>
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Sidebar
+with st.sidebar:
+    st.title("📄 Upload Content")
 
 # Initialize session state
 if 'urls' not in st.session_state:
@@ -34,18 +192,19 @@ def add_url():
     st.session_state.urls.append('')
 
 # Display URL input fields dynamically
-for i in range(len(st.session_state.urls)):
-    st.session_state.urls[i] = st.sidebar.text_input(f"URL {i+1}", value=st.session_state.urls[i], key=f"url_{i}")
+with st.sidebar.expander("Add URLs", expanded=True):
+    for i in range(len(st.session_state.urls)):
+        st.session_state.urls[i] = st.text_input(f"URL {i+1}", value=st.session_state.urls[i], key=f"url_{i}")
+
+if st.sidebar.button("➕ Add another URL"):
+    add_url()
 
 # PDF file uploader
 uploaded_files = st.sidebar.file_uploader("Upload PDF files", type=['pdf'], accept_multiple_files=True)
 if uploaded_files:
     st.session_state.pdf_files = uploaded_files
 
-if st.sidebar.button("Add another URL"):
-    add_url()
-
-process_content_clicked = st.sidebar.button("Process Content")
+process_content_clicked = st.sidebar.button("🔍 Process Content")
 
 main_placeholder = st.empty()
 chat_model = ChatOpenAI(temperature=0.7, max_tokens=500)
@@ -58,21 +217,10 @@ def extract_text_from_pdf(pdf):
     return text
 
 def preprocess_text(text):
-    # Remove extra whitespace
     text = re.sub(r'\s+', ' ', text).strip()
-    # Remove URLs
     text = re.sub(r'http\S+', '', text)
-    # Remove special characters except punctuation
     text = re.sub(r'[^\w\s.,!?]', '', text)
     return text
-
-def remove_duplicates(text):
-    sentences = text.split('. ')
-    unique_sentences = []
-    for sentence in sentences:
-        if sentence not in unique_sentences:
-            unique_sentences.append(sentence)
-    return '. '.join(unique_sentences)
 
 if process_content_clicked:
     documents = []
@@ -115,9 +263,6 @@ if process_content_clicked:
         vectorstore = FAISS.from_documents(docs, embeddings)
         st.session_state.vectorstore = vectorstore
 
-        # Initialize conversation memory
-        st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
         main_placeholder.text(f"Processing complete. Total chunks: {len(docs)}")
         time.sleep(2)
     else:
@@ -137,51 +282,81 @@ PROMPT = PromptTemplate(
     input_variables=["context", "question"]
 )
 
-# Create the ConversationalRetrievalChain
-if 'chain' not in st.session_state and st.session_state.vectorstore is not None:
-    st.session_state.chain = ConversationalRetrievalChain.from_llm(
+# Create the RetrievalQA chain
+if 'qa' not in st.session_state and st.session_state.vectorstore is not None:
+    st.session_state.qa = RetrievalQA.from_chain_type(
         llm=chat_model,
+        chain_type="stuff",
         retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
-        memory=st.session_state.memory,
-        combine_docs_chain_kwargs={"prompt": PROMPT}
+        chain_type_kwargs={"prompt": PROMPT},
+        return_source_documents=True
     )
 
 # Display chat history
 for message in st.session_state.chat_history:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    message_class = "user-message" if message["role"] == "user" else "bot-message"
+    with st.container():
+        st.markdown(f"""
+            <div class='chat-message {message_class}'>
+                <p>{message['content']}</p>
+            </div>
+        """, unsafe_allow_html=True)
 
 # Chat input
-if prompt := st.chat_input("What would you like to know?"):
+if prompt := st.chat_input("💬 What would you like to know?"):
     st.session_state.chat_history.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    with st.container():
+        st.markdown(f"""
+            <div class='chat-message user-message'>
+                <p>{prompt}</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-    with st.chat_message("assistant"):
+    with st.container():
         message_placeholder = st.empty()
         full_response = ""
 
-        if 'chain' in st.session_state:
-            result = st.session_state.chain({"question": prompt})
-            full_response = remove_duplicates(result['answer'])
+        if 'qa' in st.session_state:
+            result = st.session_state.qa({"query": prompt})
+            answer = result['result']
+            source_documents = result['source_documents']
 
-            # Simulate stream of response with milliseconds delay
-            for chunk in full_response.split():
-                full_response += chunk + " "
-                time.sleep(0.05)
-                # Add a blinking cursor to simulate typing
-                message_placeholder.markdown(full_response + "▌")
-            message_placeholder.markdown(full_response)
+            sources = set([doc.metadata['source'] for doc in source_documents])
+            sources_text = "\n\nSources: " + ", ".join(sources)
+
+            full_response = answer + sources_text
+
+            for i in range(len(full_response)):
+                time.sleep(0.01)
+                message_placeholder.markdown(f"""
+                    <div class='chat-message bot-message'>
+                        <p>{full_response[:i]}▌</p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            message_placeholder.markdown(f"""
+                <div class='chat-message bot-message'>
+                    <p>{full_response}</p>
+                </div>
+            """, unsafe_allow_html=True)
         else:
             full_response = "Please process some content before starting the chat."
-            message_placeholder.markdown(full_response)
+            message_placeholder.markdown(f"""
+                <div class='chat-message bot-message'>
+                    <p>{full_response}</p>
+                </div>
+            """, unsafe_allow_html=True)
 
-        st.session_state.chat_history.append({"role": "assistant", "content": full_response})
+    st.session_state.chat_history.append({"role": "assistant", "content": full_response})
 
-# Add a button to clear chat history
-if st.button("Clear Chat History"):
+# Add buttons to clear chat history and processed content
+st.sidebar.write("## Manage Session")
+if st.sidebar.button("🧹 Clear Chat History"):
     st.session_state.chat_history = []
-    if 'memory' in st.session_state:
-        st.session_state.memory.clear()
-    if 'chain' in st.session_state:
-        del st.session_state.chain
+    st.success("Chat history cleared.")
+
+if st.sidebar.button("🗑️ Clear Processed Content"):
+    st.session_state.vectorstore = None
+    if 'qa' in st.session_state:
+        del st.session_state.qa
+    st.success("Processed content cleared. You can now upload new content.")
