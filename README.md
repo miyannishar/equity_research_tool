@@ -1,17 +1,17 @@
 
-# ResearchBot: News Research Tool 
+# ResearchMate: Your Ultimate Research Companion
 
-ResearchBot is a user-friendly news research tool designed for effortless information retrieval. Users can input article URLs and ask questions to receive relevant insights from the stock market and financial domain.
+ResearchMate is a versatile and user-friendly research tool designed to facilitate effortless information retrieval and analysis. Whether you're a student, researcher, or just curious, ResearchMate helps you find answers from provided URLs and uploaded PDF files. 
+
 
 ![](RREADME.png)
 
 ## Features
 
-- Load URLs or upload text files containing URLs to fetch article content.
-- Process article content through LangChain's UnstructuredURL Loader
-- Construct an embedding vector using OpenAI's embeddings and leverage FAISS, a powerful similarity search library, to enable swift and effective retrieval of relevant information
-- Interact with the LLM's (Chatgpt) by inputting queries and receiving answers along with source URLs.
-
+- **Dynamic Content Loading**: Upload URLs or PDF files to fetch and process content effortlessly.
+- **Advanced Content Processing**: Utilize LangChain's UnstructuredURL Loader for URLs and PyMuPDF for PDFs.
+- **Embedding Vector Construction**: Leverage OpenAI's embeddings and FAISS for swift and efficient retrieval of relevant information.
+- **Interactive Q&A**: Ask questions and receive precise answers along with source references from the processed content.
 
 ## Installation
 
@@ -55,14 +55,20 @@ streamlit run main.py
 
 - The FAISS index will be saved in a local file path in pickle format for future use.
 - One can now ask a question and get the answer based on those news articles
-- In video tutorial, we used following news articles
-  - https://www.moneycontrol.com/news/business/tata-motors-mahindra-gain-certificates-for-production-linked-payouts-11281691.html
-  - https://www.moneycontrol.com/news/business/tata-motors-launches-punch-icng-price-starts-at-rs-7-1-lakh-11098751.html
-  - https://www.moneycontrol.com/news/business/stocks/buy-tata-motors-target-of-rs-743-kr-choksey-11080811.html
+
+
+### Example Use Case
+
+Imagine you're a student researching automotive industry trends. You have several articles and reports in the form of URLs and PDFs. By using ResearchMate, you can:
+
+1. Input the URLs and upload the PDFs.
+2. Process the content and index it for efficient search.
+3. Ask specific questions, like "What are the latest trends in the automotive industry?" or "What are the production forecasts for Tata Motors?"
+4. Receive concise, context-based answers along with source references.
 
 ## Project Structure
 
-- main.py: The main Streamlit application script.
-- requirements.txt: A list of required Python packages for the project.
-- faiss_store_openai.pkl: A pickle file to store the FAISS index.
-- .env: Configuration file for storing your OpenAI API key.
+- **main.py**: The main Streamlit application script.
+- **requirements.txt**: A list of required Python packages for the project.
+- **faiss_store_openai.pkl**: A pickle file to store the FAISS index.
+- **.env**: Configuration file for storing your OpenAI API key.
