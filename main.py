@@ -271,7 +271,7 @@ if process_content_clicked:
 # Custom prompt template
 template = """You are an AI assistant tasked with answering questions based on the given context. 
 Use the information provided in the context to answer the question concisely and avoid repetition. 
-If the answer cannot be found in the context, simply state that you don't have enough information to answer accurately.
+I am saying this strictly that If the answer cannot be found in the context, simply state that you don't have enough information to answer accurately.
 
 Context: {context}
 Question: {question}
