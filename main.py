@@ -12,13 +12,10 @@ from langchain.docstore.document import Document
 from langchain.prompts import PromptTemplate
 import re
 
-# Ensure that the OPENAI_API_KEY is set
 os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
 
-# Set page config
 st.set_page_config(page_title="📰 ResearchMate", page_icon="📰", layout="wide")
 
-# Apply custom CSS for light and dark theme
 st.markdown("""
 <style>
     :root {
@@ -159,7 +156,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Main title with animation
 st.markdown("""
     <h1 style='text-align: center; color: inherit !important; animation: pulse 2s infinite;'>
         📰 ResearchMate
@@ -173,11 +169,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar
 with st.sidebar:
     st.title("📄 Upload Content")
 
-# Initialize session state
 if 'urls' not in st.session_state:
     st.session_state.urls = ['']
 if 'pdf_files' not in st.session_state:
@@ -187,11 +181,9 @@ if 'vectorstore' not in st.session_state:
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
-# Function to add a new URL input
 def add_url():
     st.session_state.urls.append('')
 
-# Display URL input fields dynamically
 with st.sidebar.expander("Add URLs", expanded=True):
     for i in range(len(st.session_state.urls)):
         st.session_state.urls[i] = st.text_input(f"URL {i+1}", value=st.session_state.urls[i], key=f"url_{i}")
@@ -199,7 +191,6 @@ with st.sidebar.expander("Add URLs", expanded=True):
 if st.sidebar.button("➕ Add another URL"):
     add_url()
 
-# PDF file uploader
 uploaded_files = st.sidebar.file_uploader("Upload PDF files", type=['pdf'], accept_multiple_files=True)
 if uploaded_files:
     st.session_state.pdf_files = uploaded_files
@@ -225,7 +216,6 @@ def preprocess_text(text):
 if process_content_clicked:
     documents = []
     
-    # Process URLs
     valid_urls = [url for url in st.session_state.urls if url.strip()]
     if valid_urls:
         main_placeholder.text("Processing URLs...")
@@ -268,7 +258,6 @@ if process_content_clicked:
     else:
         st.warning("No content to process. Please add URLs or upload PDF files.")
 
-# Custom prompt template
 template = """You are an AI assistant tasked with answering questions based on the given context. 
 Use the information provided in the context to answer the question concisely and avoid repetition. 
 I am saying this strictly that If the answer cannot be found in the context, simply state that you don't have enough information to answer accurately.
@@ -282,7 +271,6 @@ PROMPT = PromptTemplate(
     input_variables=["context", "question"]
 )
 
-# Create the RetrievalQA chain
 if 'qa' not in st.session_state and st.session_state.vectorstore is not None:
     st.session_state.qa = RetrievalQA.from_chain_type(
         llm=chat_model,
@@ -292,7 +280,6 @@ if 'qa' not in st.session_state and st.session_state.vectorstore is not None:
         return_source_documents=True
     )
 
-# Display chat history
 for message in st.session_state.chat_history:
     message_class = "user-message" if message["role"] == "user" else "bot-message"
     with st.container():
@@ -302,7 +289,6 @@ for message in st.session_state.chat_history:
             </div>
         """, unsafe_allow_html=True)
 
-# Chat input
 if prompt := st.chat_input("💬 What would you like to know?"):
     st.session_state.chat_history.append({"role": "user", "content": prompt})
     with st.container():
@@ -349,7 +335,6 @@ if prompt := st.chat_input("💬 What would you like to know?"):
 
     st.session_state.chat_history.append({"role": "assistant", "content": full_response})
 
-# Add buttons to clear chat history and processed content
 st.sidebar.write("## Manage Session")
 if st.sidebar.button("🧹 Clear Chat History"):
     st.session_state.chat_history = []
