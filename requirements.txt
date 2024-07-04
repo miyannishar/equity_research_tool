@@ -2,7 +2,6 @@ faiss-cpu==1.8.0
 langchain==0.2.2
 langchain-community==0.2.3
 libmagic==1.0
-numpy==1.26.4
 openai==1.31.1
 pandas==2.2.2
 sentence-transformers==3.0.0
@@ -12,4 +11,3 @@ unstructured==0.14.4
 unstructured-client==0.23.0
 PyMuPDF
 requests
-faiss-cpu
