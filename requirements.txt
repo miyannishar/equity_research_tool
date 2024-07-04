@@ -1,7 +1,6 @@
 faiss-cpu==1.8.0
 langchain==0.2.2
 langchain-community==0.2.3
-libmagic==1.0
 openai==1.31.1
 streamlit==1.35.0
 tiktoken==0.7.0
