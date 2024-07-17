@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import time
-import fitz  # PyMuPDF
+import fitz 
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 from langchain.document_loaders import UnstructuredURLLoader
