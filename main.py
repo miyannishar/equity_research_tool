@@ -11,9 +11,94 @@ from langchain.vectorstores import FAISS
 from langchain.docstore.document import Document
 from langchain.prompts import PromptTemplate
 import re
+from database import create_user, verify_user, update_password
+from dotenv import load_dotenv
 
-os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
+# Load environment variables
+load_dotenv()
 
+# Get OpenAI API key from environment variables
+openai_api_key = os.getenv('OPENAI_API_KEY')
+if not openai_api_key:
+    st.error("OpenAI API key not found in environment variables")
+    st.stop()
+
+# Define authentication functions first
+def login_page():
+    st.markdown("""
+        <h2 style='text-align: center;'>Welcome to ResearchMate</h2>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("### Login")
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_password")
+        
+        if st.button("Login"):
+            if email and password:
+                success, result = verify_user(email, password)
+                if success:
+                    st.session_state.authenticated = True
+                    st.session_state.user = result
+                    st.rerun()
+                else:
+                    st.error(result)
+            else:
+                st.error("Please fill in all fields")
+                
+        if st.button("Forgot Password?"):
+            st.session_state.current_page = 'forgot_password'
+            st.rerun()
+    
+    with col2:
+        st.markdown("### Sign Up")
+        name = st.text_input("Name", key="signup_name")
+        email = st.text_input("Email", key="signup_email")
+        password = st.text_input("Password", type="password", key="signup_password")
+        confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
+        
+        if st.button("Sign Up"):
+            if name and email and password and confirm_password:
+                if password != confirm_password:
+                    st.error("Passwords do not match")
+                else:
+                    success, message = create_user(email, password, name)
+                    if success:
+                        st.success(message)
+                        st.session_state.current_page = 'login'
+                        st.rerun()
+                    else:
+                        st.error(message)
+            else:
+                st.error("Please fill in all fields")
+
+def forgot_password_page():
+    st.markdown("### Reset Password")
+    email = st.text_input("Enter your email")
+    new_password = st.text_input("New Password", type="password")
+    confirm_password = st.text_input("Confirm New Password", type="password")
+    
+    if st.button("Reset Password"):
+        if email and new_password and confirm_password:
+            if new_password != confirm_password:
+                st.error("Passwords do not match")
+            else:
+                if update_password(email, new_password):
+                    st.success("Password updated successfully!")
+                    st.session_state.current_page = 'login'
+                    st.rerun()
+                else:
+                    st.error("Email not found")
+        else:
+            st.error("Please fill in all fields")
+    
+    if st.button("Back to Login"):
+        st.session_state.current_page = 'login'
+        st.rerun()
+
+# Main app configuration
 st.set_page_config(page_title="📰 ResearchMate", page_icon="📰", layout="wide")
 
 with open("styles.css") as f:
@@ -32,8 +117,36 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Initialize session state variables
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'user' not in st.session_state:
+    st.session_state.user = None
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'login'
+if 'urls' not in st.session_state:
+    st.session_state.urls = ['']
+if 'pdf_files' not in st.session_state:
+    st.session_state.pdf_files = []
+if 'vectorstore' not in st.session_state:
+    st.session_state.vectorstore = None
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
+
+# Authentication check
+if not st.session_state.authenticated:
+    if st.session_state.current_page == 'login':
+        login_page()
+    elif st.session_state.current_page == 'forgot_password':
+        forgot_password_page()
+    st.stop()
+
+# Main app content (only shown when authenticated)
 with st.sidebar:
-    st.title("📄 Upload Content")
+    if st.button("🚪 Logout"):
+        st.session_state.authenticated = False
+        st.session_state.user = None
+        st.rerun()
 
 if 'urls' not in st.session_state:
     st.session_state.urls = ['']
@@ -61,7 +174,7 @@ if uploaded_files:
 process_content_clicked = st.sidebar.button("🔍 Process Content")
 
 main_placeholder = st.empty()
-chat_model = ChatOpenAI(temperature=0.7, max_tokens=500)
+chat_model = ChatOpenAI(temperature=0.7, max_tokens=500, api_key=openai_api_key)
 
 def extract_text_from_pdf(pdf):
     doc = fitz.open(stream=pdf.read(), filetype="pdf")
@@ -112,7 +225,7 @@ if process_content_clicked:
         docs = text_splitter.split_documents(documents)
 
         main_placeholder.text("Building vector store...")
-        embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings(api_key=openai_api_key)
         vectorstore = FAISS.from_documents(docs, embeddings)
         st.session_state.vectorstore = vectorstore
 

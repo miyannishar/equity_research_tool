@@ -10,3 +10,6 @@ requests
 unstructured
 python-magic==0.4.15
 psutil
+pymongo
+bcrypt
+python-dotenv
