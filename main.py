@@ -2,17 +2,21 @@ import os
 import streamlit as st
 import time
 import fitz 
-from langchain.chat_models import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
+
 from langchain.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.docstore.document import Document
-from langchain.prompts import PromptTemplate
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+from langchain_core.prompts import PromptTemplate
 import re
 from database import create_user, verify_user, update_password
 from dotenv import load_dotenv
+from langchain_core.language_models.chat_models import BaseChatModel
+from typing import Any, List, Optional
+from langchain.schema import HumanMessage
 
 # Define authentication functions first
 def login_page():
@@ -94,11 +98,8 @@ def forgot_password_page():
         st.session_state.current_page = 'login'
         st.rerun()
 
-# Load environment variables
 load_dotenv()
-
-# Main app configuration
-# os.environ['OPENAI_API_KEY'] = "sk-..." <- Remove this line
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 st.set_page_config(page_title="📰 ResearchMate", page_icon="📰", layout="wide")
 
@@ -175,7 +176,12 @@ if uploaded_files:
 process_content_clicked = st.sidebar.button("🔍 Process Content")
 
 main_placeholder = st.empty()
-chat_model = ChatOpenAI(temperature=0.7, max_tokens=500)
+chat_model = ChatGroq(
+    temperature=0.7,
+    model="llama-3.1-70b-versatile",
+    api_key=GROQ_API_KEY,
+    max_tokens=500
+)
 
 def extract_text_from_pdf(pdf):
     doc = fitz.open(stream=pdf.read(), filetype="pdf")
@@ -239,7 +245,9 @@ if process_content_clicked:
         docs = text_splitter.split_documents(documents)
 
         main_placeholder.text("Building vector store...")
-        embeddings = OpenAIEmbeddings()
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-mpnet-base-v2"
+        )
         vectorstore = FAISS.from_documents(docs, embeddings)
         st.session_state.vectorstore = vectorstore
 
@@ -248,8 +256,14 @@ if process_content_clicked:
             llm=chat_model,
             chain_type="stuff",
             retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
-            chain_type_kwargs={"prompt": PROMPT},
-            return_source_documents=True
+            return_source_documents=True,
+            chain_type_kwargs={
+                "prompt": PROMPT,
+                "document_prompt": PromptTemplate(
+                    input_variables=["page_content"],
+                    template="{page_content}"
+                )
+            }
         )
 
         main_placeholder.text(f"Processing complete. Total chunks: {len(docs)}")
