@@ -14,15 +14,6 @@ import re
 from database import create_user, verify_user, update_password
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Get OpenAI API key from environment variables
-openai_api_key = os.getenv('OPENAI_API_KEY')
-if not openai_api_key:
-    st.error("OpenAI API key not found in environment variables")
-    st.stop()
-
 # Define authentication functions first
 def login_page():
     st.markdown("""
@@ -98,7 +89,12 @@ def forgot_password_page():
         st.session_state.current_page = 'login'
         st.rerun()
 
+# Load environment variables
+load_dotenv()
+
 # Main app configuration
+# os.environ['OPENAI_API_KEY'] = "sk-..." <- Remove this line
+
 st.set_page_config(page_title="📰 ResearchMate", page_icon="📰", layout="wide")
 
 with open("styles.css") as f:
@@ -174,7 +170,7 @@ if uploaded_files:
 process_content_clicked = st.sidebar.button("🔍 Process Content")
 
 main_placeholder = st.empty()
-chat_model = ChatOpenAI(temperature=0.7, max_tokens=500, api_key=openai_api_key)
+chat_model = ChatOpenAI(temperature=0.7, max_tokens=500)
 
 def extract_text_from_pdf(pdf):
     doc = fitz.open(stream=pdf.read(), filetype="pdf")
@@ -188,6 +184,19 @@ def preprocess_text(text):
     text = re.sub(r'http\S+', '', text)
     text = re.sub(r'[^\w\s.,!?]', '', text)
     return text
+
+template = """You are an AI assistant tasked with answering questions based on the given context. 
+Use the information provided in the context to answer the question in detail form. Give detailed answer with context as well. 
+I am saying this strictly that If the answer cannot be found in the context, simply state that you don't have enough information to answer accurately.
+
+Context: {context}
+Question: {question}
+Answer: """
+
+PROMPT = PromptTemplate(
+    template=template,
+    input_variables=["context", "question"]
+)
 
 if process_content_clicked:
     documents = []
@@ -225,36 +234,24 @@ if process_content_clicked:
         docs = text_splitter.split_documents(documents)
 
         main_placeholder.text("Building vector store...")
-        embeddings = OpenAIEmbeddings(api_key=openai_api_key)
+        embeddings = OpenAIEmbeddings()
         vectorstore = FAISS.from_documents(docs, embeddings)
         st.session_state.vectorstore = vectorstore
 
+        # Update QA chain with new vectorstore
+        st.session_state.qa = RetrievalQA.from_chain_type(
+            llm=chat_model,
+            chain_type="stuff",
+            retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
+            chain_type_kwargs={"prompt": PROMPT},
+            return_source_documents=True
+        )
+
         main_placeholder.text(f"Processing complete. Total chunks: {len(docs)}")
         time.sleep(2)
+        st.success("Content processed successfully! You can now ask questions about the new content.")
     else:
         st.warning("No content to process. Please add URLs or upload PDF files.")
-
-template = """You are an AI assistant tasked with answering questions based on the given context. 
-Use the information provided in the context to answer the question concisely and avoid repetition. 
-I am saying this strictly that If the answer cannot be found in the context, simply state that you don't have enough information to answer accurately.
-
-Context: {context}
-Question: {question}
-Answer: """
-
-PROMPT = PromptTemplate(
-    template=template,
-    input_variables=["context", "question"]
-)
-
-if 'qa' not in st.session_state and st.session_state.vectorstore is not None:
-    st.session_state.qa = RetrievalQA.from_chain_type(
-        llm=chat_model,
-        chain_type="stuff",
-        retriever=st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3}),
-        chain_type_kwargs={"prompt": PROMPT},
-        return_source_documents=True
-    )
 
 for message in st.session_state.chat_history:
     message_class = "user-message" if message["role"] == "user" else "bot-message"
