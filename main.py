@@ -35,7 +35,12 @@ def login_page():
                     st.session_state.user = result
                     st.rerun()
                 else:
-                    st.error(result)
+                    if result == "User not found":
+                        st.error("❌ Email not found. Please check your email or sign up.")
+                    elif result == "Incorrect password":
+                        st.error("❌ Incorrect password. Please try again.")
+                    else:
+                        st.error(f"❌ {result}")
             else:
                 st.error("Please fill in all fields")
                 
@@ -53,17 +58,17 @@ def login_page():
         if st.button("Sign Up"):
             if name and email and password and confirm_password:
                 if password != confirm_password:
-                    st.error("Passwords do not match")
+                    st.error("❌ Passwords do not match")
                 else:
                     success, message = create_user(email, password, name)
                     if success:
-                        st.success(message)
+                        st.success("✅ " + message)
                         st.session_state.current_page = 'login'
                         st.rerun()
                     else:
-                        st.error(message)
+                        st.error("❌ " + message)
             else:
-                st.error("Please fill in all fields")
+                st.error("❌ Please fill in all fields")
 
 def forgot_password_page():
     st.markdown("### Reset Password")
